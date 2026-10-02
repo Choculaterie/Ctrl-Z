@@ -4,7 +4,6 @@ import com.choculaterie.history.BlockHistory;
 import com.choculaterie.network.ClearHistoryPayload;
 import com.choculaterie.network.UndoRedoPayload;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.chat.Component;
@@ -31,6 +30,5 @@ public class CtrlZ implements ModInitializer {
 			BlockHistory.clear();
 			context.player().sendSystemMessage(Component.literal("Ctrl-Z history cleared"), true);
 		});
-		ServerTickEvents.END_SERVER_TICK.register(server -> BlockHistory.onServerTick());
 	}
 }

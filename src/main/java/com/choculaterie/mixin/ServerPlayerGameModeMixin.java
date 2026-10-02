@@ -1,6 +1,7 @@
 package com.choculaterie.mixin;
 
 import com.choculaterie.history.BlockHistory;
+import com.choculaterie.history.Cause;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerPlayerGameMode;
@@ -32,7 +33,7 @@ public abstract class ServerPlayerGameModeMixin {
 
 	@Inject(method = "destroyBlock", at = @At("HEAD"))
 	private void ctrlz$beginDestroy(BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
-		BlockHistory.begin();
+		BlockHistory.begin(Cause.BREAK_BLOCK);
 		BlockHistory.markActor(this.player);
 
 		ItemStack tool = this.player.getMainHandItem();
@@ -68,7 +69,7 @@ public abstract class ServerPlayerGameModeMixin {
 
 	@Inject(method = "useItemOn", at = @At("HEAD"))
 	private void ctrlz$beginUseItemOn(ServerPlayer player, Level level, ItemStack itemStack, InteractionHand hand, BlockHitResult hitResult, CallbackInfoReturnable<InteractionResult> cir) {
-		BlockHistory.begin();
+		BlockHistory.begin(Cause.USE_BLOCK);
 		BlockHistory.markActor(player);
 
 		if (!(itemStack.getItem() instanceof BlockItem)) {
@@ -96,7 +97,7 @@ public abstract class ServerPlayerGameModeMixin {
 
 	@Inject(method = "useItem", at = @At("HEAD"))
 	private void ctrlz$beginUseItem(ServerPlayer player, Level level, ItemStack itemStack, InteractionHand hand, CallbackInfoReturnable<InteractionResult> cir) {
-		BlockHistory.begin();
+		BlockHistory.begin(Cause.USE_ITEM);
 		BlockHistory.markActor(player);
 		ctrlz$useItemHand = hand;
 		ctrlz$useItemHeldBefore = itemStack.copy();

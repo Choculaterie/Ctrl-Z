@@ -1,6 +1,8 @@
 package com.choculaterie.mixin;
 
 import com.choculaterie.history.BlockHistory;
+import com.choculaterie.history.Cause;
+import com.choculaterie.history.TaggedAction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -31,7 +33,7 @@ public abstract class LivingEntityMixin {
 	private void ctrlz$beginHurt(ServerLevel level, DamageSource source, float damage, CallbackInfoReturnable<Boolean> cir) {
 		LivingEntity self = (LivingEntity) (Object) this;
 		if (self instanceof ServerPlayer || BlockHistory.isTracking()) {
-			BlockHistory.begin();
+			BlockHistory.begin(Cause.ENTITY_HURT);
 			ctrlz$beforeHurt = BlockHistory.snapshotEntity(self);
 		}
 	}
@@ -43,7 +45,7 @@ public abstract class LivingEntityMixin {
 			if (!self.isRemoved()) {
 				BlockHistory.recordEntityModified(level, self.getUUID(), ctrlz$beforeHurt, BlockHistory.snapshotEntity(self));
 				if (!(self instanceof ServerPlayer) && self.isDeadOrDying()) {
-					BlockHistory.watch(self.getUUID());
+					((TaggedAction) self).ctrlz$setActionId(BlockHistory.currentActionId());
 				}
 			}
 			ctrlz$beforeHurt = null;
@@ -57,7 +59,7 @@ public abstract class LivingEntityMixin {
 		if (self instanceof ServerPlayer player && !player.level().isClientSide()) {
 			ctrlz$useHand = self.getUsedItemHand();
 			ctrlz$beforeUse = self.getItemInHand(ctrlz$useHand).copy();
-			BlockHistory.begin();
+			BlockHistory.begin(Cause.USE_ITEM);
 			BlockHistory.markActor(player);
 		} else {
 			ctrlz$beforeUse = null;

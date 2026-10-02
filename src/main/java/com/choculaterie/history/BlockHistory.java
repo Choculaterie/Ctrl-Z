@@ -29,27 +29,29 @@ import net.minecraft.world.level.storage.TagValueOutput;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 
 public final class BlockHistory {
 	private static final int QUIET_UPDATE_FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_SKIP_ALL_SIDEEFFECTS;
 	private static final int MAX_DEPTH = 16;
-	private static final long MAX_PENDING_MS = 60_000;
 	private static final int HISTORY_HARD_CAP = 5000;
 
 	private static final Deque<Action> undoStack = new ArrayDeque<>();
 	private static final Deque<Action> redoStack = new ArrayDeque<>();
-	private static final Set<UUID> watchedEntities = new HashSet<>();
-	private static final Set<BlockPos> watchedBlocks = new HashSet<>();
+	private static final Map<Long, Action> actionsById = new HashMap<>();
+	private static final Deque<Action> savedActions = new LinkedList<>();
+	private static final Deque<Integer> savedDepths = new ArrayDeque<>();
+	private static final Deque<Cause> causeStack = new ArrayDeque<>();
 
 	private static Action activeAction;
-	private static Action pendingAction;
-	private static long pendingSince;
+	private static long nextActionId = 1;
 	private static int depth = 0;
 	private static boolean applying = false;
+	private static Cause currentCause = Cause.COMMAND;
 
 	private BlockHistory() {}
 
@@ -57,46 +59,43 @@ public final class BlockHistory {
 		return activeAction != null && !applying;
 	}
 
-	public static void begin() {
+	public static long currentActionId() {
+		return activeAction != null ? activeAction.id : 0;
+	}
+
+	public static void begin(Cause cause) {
 		if (depth == 0 || depth > MAX_DEPTH) {
 			resetDepth();
-			if (pendingAction != null) {
-				log("begin: a new unrelated step is starting, flushing the still-pending one to keep order correct");
-				pushIfNotEmpty(pendingAction);
-				pendingAction = null;
-			}
+			causeStack.push(currentCause);
+			currentCause = cause;
 			activeAction = new Action();
+			activeAction.id = nextActionId++;
+			activeAction.cause = cause;
+			actionsById.put(activeAction.id, activeAction);
 			log("begin: new step");
 		}
 		depth++;
 	}
 
-	public static void continueEntityChain() {
-		resumeOrBegin();
+	public static void pushAction(long id, Cause resumeCause) {
+		savedActions.push(activeAction);
+		savedDepths.push(depth);
+		causeStack.push(currentCause);
+		activeAction = id != 0 ? actionsById.get(id) : null;
+		currentCause = resumeCause != null ? resumeCause : (activeAction != null ? activeAction.cause : currentCause);
+		depth = activeAction != null ? 1 : 0;
 	}
 
-	public static void continueBlockChain(BlockPos pos) {
-		unwatchBlock(pos);
-		resumeOrBegin();
-	}
-
-	public static void continueBlockEntityChain() {
-		resumeOrBegin();
-	}
-
-	private static void resumeOrBegin() {
-		if (depth == 0 || depth > MAX_DEPTH) {
-			resetDepth();
-			if (pendingAction != null) {
-				activeAction = pendingAction;
-				pendingAction = null;
-				log("resume: continuing pending step");
-			} else {
-				activeAction = new Action();
-				log("resume: no pending step, starting new one");
+	public static void popAction() {
+		if (activeAction != null) {
+			depth--;
+			if (depth == 0) {
+				pushIfNotEmpty(activeAction);
 			}
 		}
-		depth++;
+		activeAction = savedActions.pop();
+		depth = savedDepths.pop();
+		currentCause = causeStack.pop();
 	}
 
 	private static void resetDepth() {
@@ -112,50 +111,30 @@ public final class BlockHistory {
 		}
 		depth--;
 		if (depth == 0) {
-			if (!activeAction.ownEntityWatches.isEmpty() || !activeAction.ownBlockWatches.isEmpty()) {
-				if (pendingAction != null) {
-					log("end: displacing an older pending step (unrelated), pushing it now");
-					pushIfNotEmpty(pendingAction);
-				}
-				pendingAction = activeAction;
-				pendingSince = System.currentTimeMillis();
-				log("end: step still has " + activeAction.ownEntityWatches.size() + " entity watch(es) and "
-					+ activeAction.ownBlockWatches.size() + " block watch(es) pending, holding open");
-			} else {
-				log("end: step fully resolved, pushing (" + activeAction.size() + " changes)");
-				pushIfNotEmpty(activeAction);
-			}
+			currentCause = causeStack.pop();
+			pushIfNotEmpty(activeAction);
 			activeAction = null;
 		}
 	}
 
-	public static void onServerTick() {
-		if (pendingAction == null) {
+	private static void pushIfNotEmpty(Action action) {
+		if (action.isEmpty()) {
 			return;
 		}
-		boolean resolved = pendingAction.ownEntityWatches.isEmpty() && pendingAction.ownBlockWatches.isEmpty();
-		boolean timedOut = System.currentTimeMillis() - pendingSince > MAX_PENDING_MS;
-		if (resolved || timedOut) {
-			if (timedOut && !resolved) {
-				com.choculaterie.CtrlZ.LOGGER.warn("Ctrl-Z step timed out waiting on a chain reaction, pushing anyway");
-			}
-			pushIfNotEmpty(pendingAction);
-			pendingAction = null;
-		}
-	}
-
-	private static void pushIfNotEmpty(Action action) {
-		if (!action.isEmpty()) {
+		if (!action.inUndoStack) {
 			undoStack.push(action);
-			redoStack.clear();
-			trimHistory();
+			action.inUndoStack = true;
+			log("step pushed (" + action.size() + " changes)");
 		}
+		redoStack.clear();
+		trimHistory();
 	}
 
 	private static void trimHistory() {
 		int cap = HistorySettings.isTimeBased() ? HISTORY_HARD_CAP : HistorySettings.getValue();
 		while (undoStack.size() > cap) {
-			undoStack.removeLast();
+			Action discarded = undoStack.removeLast();
+			actionsById.remove(discarded.id);
 		}
 	}
 
@@ -166,50 +145,7 @@ public final class BlockHistory {
 	public static void clear() {
 		undoStack.clear();
 		redoStack.clear();
-		pendingAction = null;
-	}
-
-	public static void watch(UUID entityId) {
-		watchedEntities.add(entityId);
-		if (isTracking()) {
-			activeAction.ownEntityWatches.add(entityId);
-		}
-	}
-
-	public static boolean isWatched(UUID entityId) {
-		return watchedEntities.contains(entityId);
-	}
-
-	public static void unwatch(UUID entityId) {
-		watchedEntities.remove(entityId);
-		if (pendingAction != null) {
-			pendingAction.ownEntityWatches.remove(entityId);
-		}
-		if (activeAction != null) {
-			activeAction.ownEntityWatches.remove(entityId);
-		}
-	}
-
-	public static void watchBlock(BlockPos pos) {
-		BlockPos key = pos.immutable();
-		watchedBlocks.add(key);
-		if (isTracking()) {
-			activeAction.ownBlockWatches.add(key);
-		}
-	}
-
-	public static boolean isBlockWatched(BlockPos pos) {
-		return watchedBlocks.contains(pos);
-	}
-
-	public static void unwatchBlock(BlockPos pos) {
-		watchedBlocks.remove(pos);
-		if (pendingAction != null) {
-			pendingAction.ownBlockWatches.remove(pos);
-		}
-		if (activeAction != null) {
-			activeAction.ownBlockWatches.remove(pos);
-		}
+		actionsById.clear();
 	}
 
 	public static void markActor(ServerPlayer player) {
@@ -220,14 +156,16 @@ public final class BlockHistory {
 	}
 
 	public static void recordToolDurability(ServerPlayer player, Item item, int oldDamage, int newDamage, boolean broke) {
-		if (!isTracking() || player.isCreative() || player.isSpectator()) {
+		if (!isTracking() || !UndoCategorySettings.isTrackInventory() || !CauseSettings.isEnabled(CauseSettings.Category.INVENTORY, currentCause)
+			|| player.isSpectator()) {
 			return;
 		}
 		activeAction.toolDurability.add(new ToolDurabilityChange(player.getUUID(), item, oldDamage, newDamage, broke));
 	}
 
 	public static void recordHeldItemChange(ServerPlayer player, ItemStack before, ItemStack after) {
-		if (!isTracking() || player.isCreative() || player.isSpectator() || before.isEmpty()) {
+		if (!isTracking() || !UndoCategorySettings.isTrackInventory() || !CauseSettings.isEnabled(CauseSettings.Category.INVENTORY, currentCause)
+			|| player.isSpectator() || before.isEmpty()) {
 			return;
 		}
 		Item consumedItem = before.getItem();
@@ -240,12 +178,21 @@ public final class BlockHistory {
 	}
 
 	public static int reserveBlock(ServerLevel level, BlockPos pos, BlockState oldState, CompoundTag oldNbt, BlockState newState) {
-		if (!isTracking()) {
+		if (!isTracking() || !UndoCategorySettings.isTrackBlocks() || !CauseSettings.isEnabled(CauseSettings.Category.BLOCKS, currentCause)) {
 			return -1;
 		}
 		try {
-			activeAction.blocks.add(new BlockChange(level.dimension(), pos.immutable(), oldState, oldNbt, newState, null));
-			return activeAction.blocks.size() - 1;
+			BlockPos key = pos.immutable();
+			Integer existingSlot = activeAction.blockSlotByPos.get(key);
+			if (existingSlot != null) {
+				BlockChange original = activeAction.blocks.get(existingSlot);
+				activeAction.blocks.set(existingSlot, new BlockChange(level.dimension(), key, original.oldState(), original.oldNbt(), newState, null));
+				return existingSlot;
+			}
+			int slot = activeAction.blocks.size();
+			activeAction.blocks.add(new BlockChange(level.dimension(), key, oldState, oldNbt, newState, null));
+			activeAction.blockSlotByPos.put(key, slot);
+			return slot;
 		} catch (Throwable t) {
 			com.choculaterie.CtrlZ.LOGGER.error("Failed to reserve block change at {}", pos, t);
 			return -1;
@@ -264,13 +211,13 @@ public final class BlockHistory {
 		}
 	}
 
-	public static void cancelBlock(int slot) {
+	public static void cancelBlock(int slot, BlockState revertState, CompoundTag revertNbt) {
 		if (slot < 0 || activeAction == null || slot >= activeAction.blocks.size()) {
 			return;
 		}
 		try {
 			BlockChange pending = activeAction.blocks.get(slot);
-			activeAction.blocks.set(slot, new BlockChange(pending.dimension(), pending.pos(), pending.oldState(), pending.oldNbt(), pending.oldState(), pending.oldNbt()));
+			activeAction.blocks.set(slot, new BlockChange(pending.dimension(), pending.pos(), pending.oldState(), pending.oldNbt(), revertState, revertNbt));
 		} catch (Throwable t) {
 			com.choculaterie.CtrlZ.LOGGER.error("Failed to cancel block change", t);
 		}
@@ -283,8 +230,10 @@ public final class BlockHistory {
 		try {
 			CompoundTag nbt = snapshotEntity(entity);
 			if (nbt != null) {
-				activeAction.entities.add(new EntityChange(level.dimension(), entity.getUUID(), null, nbt));
-				watch(entity.getUUID());
+				if (UndoCategorySettings.isTrackEntities() && CauseSettings.isEnabled(CauseSettings.Category.ENTITIES, currentCause)) {
+					activeAction.entities.add(new EntityChange(level.dimension(), entity.getUUID(), null, nbt));
+				}
+				((TaggedAction) entity).ctrlz$setActionId(activeAction.id);
 			}
 		} catch (Throwable t) {
 			com.choculaterie.CtrlZ.LOGGER.error("Failed to record entity add", t);
@@ -292,7 +241,7 @@ public final class BlockHistory {
 	}
 
 	public static void recordEntityRemoved(ServerLevel level, Entity entity) {
-		if (!isTracking()) {
+		if (!isTracking() || !UndoCategorySettings.isTrackEntities() || !CauseSettings.isEnabled(CauseSettings.Category.ENTITIES, currentCause)) {
 			return;
 		}
 		try {
@@ -306,7 +255,8 @@ public final class BlockHistory {
 	}
 
 	public static void recordEntityModified(ServerLevel level, UUID entityId, CompoundTag oldNbt, CompoundTag newNbt) {
-		if (!isTracking() || oldNbt == null || newNbt == null || oldNbt.equals(newNbt)) {
+		if (!isTracking() || !UndoCategorySettings.isTrackEntities() || !CauseSettings.isEnabled(CauseSettings.Category.ENTITIES, currentCause)
+			|| oldNbt == null || newNbt == null || oldNbt.equals(newNbt)) {
 			return;
 		}
 		try {
@@ -345,21 +295,11 @@ public final class BlockHistory {
 	}
 
 	public static void undo(ServerPlayer requester) {
-		forceResolvePending();
 		apply(requester, undoStack, redoStack, false);
 	}
 
 	public static void redo(ServerPlayer requester) {
-		forceResolvePending();
 		apply(requester, redoStack, undoStack, true);
-	}
-
-	private static void forceResolvePending() {
-		if (pendingAction != null) {
-			log("undo/redo requested while a step was still pending, resolving it now");
-			pushIfNotEmpty(pendingAction);
-			pendingAction = null;
-		}
 	}
 
 	private static void apply(ServerPlayer requester, Deque<Action> from, Deque<Action> to, boolean forward) {
@@ -384,6 +324,12 @@ public final class BlockHistory {
 			}
 		} else {
 			batch.add(from.pop());
+		}
+
+		if (!forward) {
+			for (Action action : batch) {
+				actionsById.remove(action.id);
+			}
 		}
 
 		applying = true;
@@ -576,7 +522,6 @@ public final class BlockHistory {
 					tnt.setFuse(80);
 				}
 				level.addFreshEntity(entity);
-				watch(entity.getUUID());
 			}
 		}
 	}
@@ -619,17 +564,19 @@ public final class BlockHistory {
 		final List<EntityChange> entities = new ArrayList<>();
 		final List<ToolDurabilityChange> toolDurability = new ArrayList<>();
 		final List<HeldItemChange> heldItems = new ArrayList<>();
-		final Set<UUID> ownEntityWatches = new HashSet<>();
-		final Set<BlockPos> ownBlockWatches = new HashSet<>();
+		final Map<BlockPos, Integer> blockSlotByPos = new HashMap<>();
+		long id;
+		Cause cause;
+		boolean inUndoStack;
 		UUID actorUuid;
 		boolean actorSurvival;
 
 		boolean isEmpty() {
-			return blocks.isEmpty() && entities.isEmpty();
+			return blocks.isEmpty() && entities.isEmpty() && toolDurability.isEmpty() && heldItems.isEmpty();
 		}
 
 		int size() {
-			return blocks.size() + entities.size();
+			return blocks.size() + entities.size() + toolDurability.size() + heldItems.size();
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package com.choculaterie.mixin;
 
 import com.choculaterie.history.BlockHistory;
+import com.choculaterie.history.Cause;
 import net.minecraft.world.level.ServerExplosion;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -12,7 +13,7 @@ public abstract class ServerExplosionMixin {
 
 	@Inject(method = "explode", at = @At("HEAD"))
 	private void ctrlz$begin(CallbackInfoReturnable<Integer> cir) {
-		BlockHistory.begin();
+		BlockHistory.begin(Cause.EXPLOSION);
 	}
 
 	@Inject(method = "explode", at = @At("RETURN"))

@@ -1,6 +1,7 @@
 package com.choculaterie.mixin;
 
 import com.choculaterie.history.BlockHistory;
+import com.choculaterie.history.Cause;
 import com.mojang.brigadier.ParseResults;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -22,7 +23,7 @@ public abstract class CommandsMixin {
 		ServerPlayer player = command.getContext().getSource().getPlayer();
 		ctrlz$tracking = player != null;
 		if (ctrlz$tracking) {
-			BlockHistory.begin();
+			BlockHistory.begin(Cause.COMMAND);
 		}
 	}
 

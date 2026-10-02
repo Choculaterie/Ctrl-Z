@@ -39,7 +39,7 @@ public abstract class LevelMixin {
 			CompoundTag newNbt = BlockHistory.snapshotBlockEntity(level, pos);
 			BlockHistory.finalizeBlock(slot, newNbt);
 		} else {
-			BlockHistory.cancelBlock(slot);
+			BlockHistory.cancelBlock(slot, oldState, oldNbt);
 		}
 		return result;
 	}
