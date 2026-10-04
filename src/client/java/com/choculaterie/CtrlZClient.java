@@ -10,9 +10,10 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
+import net.minecraft.client.input.KeyEvent;
 
 public class CtrlZClient implements ClientModInitializer {
+	private static int suppressedMenuClicks = 0;
 
 	@Override
 	public void onInitializeClient() {
@@ -22,48 +23,58 @@ public class CtrlZClient implements ClientModInitializer {
 
 	private static void onClientTick(Minecraft client) {
 		while (ModKeybindings.OPEN_MENU_KEY_BINDING.consumeClick()) {
-			if (!matchesOpenMenuKey(KeybindSettings.UNDO) && !matchesOpenMenuKey(KeybindSettings.REDO)) {
+			if (suppressedMenuClicks > 0) {
+				suppressedMenuClicks--;
+			} else {
 				toggleScreen(client);
 			}
 		}
-
-		if (client.gui.screen() != null || client.player == null) {
-			return;
-		}
-		if (KeybindSettings.isCreativeOnly() && !client.player.isCreative()) {
-			return;
-		}
-
-		long windowHandle = GLFW.glfwGetCurrentContext();
-		if (windowHandle == 0 || !ClientPlayNetworking.canSend(UndoRedoPayload.TYPE)) {
-			return;
-		}
-
-		if (KeybindSettings.UNDO.consumeClick(windowHandle)) {
-			ClientPlayNetworking.send(new UndoRedoPayload(false));
-		}
-		if (KeybindSettings.REDO.consumeClick(windowHandle)) {
-			ClientPlayNetworking.send(new UndoRedoPayload(true));
-		}
+		suppressedMenuClicks = 0;
 	}
 
-	private static boolean matchesOpenMenuKey(KeyCombo combo) {
-		int[] keys = combo.keys();
-		if (keys.length == 0) {
+	public static boolean onKeyPress(int action, KeyEvent event) {
+		if (action == InputConstants.RELEASE) {
 			return false;
 		}
-		boolean containsOpenMenuKey = false;
-		for (int key : keys) {
-			if (ModKeybindings.OPEN_MENU_KEY_BINDING.matches(InputConstants.Type.KEYSYM.getOrCreate(key))) {
-				containsOpenMenuKey = true;
-				break;
-			}
-		}
-		if (!containsOpenMenuKey) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.gui.screen() != null || client.player == null) {
 			return false;
 		}
-		long windowHandle = GLFW.glfwGetCurrentContext();
-		return windowHandle != 0 && combo.allDown(windowHandle);
+		KeyCombo combo = completedCombo(event.key(), event.modifiers());
+		if (combo == null) {
+			return false;
+		}
+		if (action == InputConstants.PRESS && canUndoRedo(client)) {
+			ClientPlayNetworking.send(new UndoRedoPayload(combo == KeybindSettings.REDO));
+		}
+		if (KeybindSettings.isBlockOtherKeybinds()) {
+			return true;
+		}
+		if (action == InputConstants.PRESS
+				&& ModKeybindings.OPEN_MENU_KEY_BINDING.matches(InputConstants.Type.KEYBOARD.getOrCreate(event.key()))) {
+			suppressedMenuClicks++;
+		}
+		return false;
+	}
+
+	private static KeyCombo completedCombo(int pressedKey, int modifiers) {
+		boolean undo = KeybindSettings.UNDO.isCompletedBy(pressedKey, modifiers);
+		boolean redo = KeybindSettings.REDO.isCompletedBy(pressedKey, modifiers);
+		if (undo && redo) {
+			return KeybindSettings.REDO.keys().length > KeybindSettings.UNDO.keys().length
+				? KeybindSettings.REDO : KeybindSettings.UNDO;
+		}
+		if (undo) {
+			return KeybindSettings.UNDO;
+		}
+		return redo ? KeybindSettings.REDO : null;
+	}
+
+	private static boolean canUndoRedo(Minecraft client) {
+		if (KeybindSettings.isCreativeOnly() && !client.player.isCreative()) {
+			return false;
+		}
+		return ClientPlayNetworking.canSend(UndoRedoPayload.TYPE);
 	}
 
 	private static void toggleScreen(Minecraft client) {

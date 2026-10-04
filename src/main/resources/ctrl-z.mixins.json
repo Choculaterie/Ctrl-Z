@@ -18,6 +18,9 @@
 		"ServerPlayerGameModeMixin",
 		"ServerPlayerMixin"
 	],
+	"client": [
+		"client.KeyboardHandlerMixin"
+	],
 	"injectors": {
 		"defaultRequire": 1
 	}

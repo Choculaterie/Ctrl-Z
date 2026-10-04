@@ -1,11 +1,9 @@
 package com.choculaterie.keybind;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import org.lwjgl.glfw.GLFW;
 
 public final class KeyCombo {
 	private int[] keys;
-	private boolean wasActive;
 
 	public KeyCombo(int... keys) {
 		set(keys);
@@ -13,7 +11,6 @@ public final class KeyCombo {
 
 	public void set(int... keys) {
 		this.keys = keys.clone();
-		this.wasActive = false;
 	}
 
 	public int[] keys() {
@@ -29,20 +26,26 @@ public final class KeyCombo {
 		return false;
 	}
 
-	public boolean consumeClick(long windowHandle) {
-		boolean active = keys.length > 0 && allDown(windowHandle);
-		boolean fire = active && !wasActive;
-		wasActive = active;
-		return fire;
-	}
-
-	public boolean allDown(long windowHandle) {
+	public boolean isCompletedBy(int pressedKey, int modifiers) {
+		if (keys.length == 0 || !containsKey(pressedKey)) {
+			return false;
+		}
 		for (int k : keys) {
-			if (GLFW.glfwGetKey(windowHandle, k) != GLFW.GLFW_PRESS) {
+			if (k != pressedKey && !isHeld(k, modifiers)) {
 				return false;
 			}
 		}
 		return true;
+	}
+
+	private static boolean isHeld(int key, int modifiers) {
+		return switch (key) {
+			case InputConstants.KEY_LCONTROL, InputConstants.KEY_RCONTROL -> (modifiers & InputConstants.MOD_CONTROL) != 0;
+			case InputConstants.KEY_LSHIFT, InputConstants.KEY_RSHIFT -> (modifiers & InputConstants.MOD_SHIFT) != 0;
+			case InputConstants.KEY_LALT, InputConstants.KEY_RALT -> (modifiers & InputConstants.MOD_ALT) != 0;
+			case InputConstants.KEY_LGUI, InputConstants.KEY_RGUI -> (modifiers & InputConstants.MOD_SUPER) != 0;
+			default -> InputConstants.isKeyDown(key);
+		};
 	}
 
 	public String display() {
@@ -54,7 +57,7 @@ public final class KeyCombo {
 			if (i > 0) {
 				text.append(" + ");
 			}
-			text.append(InputConstants.Type.KEYSYM.getOrCreate(keys[i]).getDisplayName().getString());
+			text.append(InputConstants.Type.KEYBOARD.getOrCreate(keys[i]).getDisplayName().getString());
 		}
 		return text.toString();
 	}

@@ -34,6 +34,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import net.minecraft.util.Prediction;
 
 public final class BlockHistory {
 	private static final int QUIET_UPDATE_FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_SKIP_ALL_SIDEEFFECTS;
@@ -416,7 +417,7 @@ public final class BlockHistory {
 
 	private static void giveItem(ServerPlayer player, ItemStack stack) {
 		if (!player.getInventory().add(stack)) {
-			player.drop(stack, false);
+			player.drop(stack, false, Prediction.SERVER_ONLY);
 		}
 	}
 

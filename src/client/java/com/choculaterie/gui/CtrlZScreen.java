@@ -53,6 +53,7 @@ public class CtrlZScreen extends Screen {
 	private CustomButton historyUnitButton;
 	private CustomButton clearButton;
 	private ToggleButton creativeOnlyToggle;
+	private ToggleButton blockOtherKeybindsToggle;
 	private ToggleButton trackBlocksToggle;
 	private ToggleButton trackEntitiesToggle;
 	private ToggleButton trackInventoryToggle;
@@ -90,7 +91,7 @@ public class CtrlZScreen extends Screen {
 		contentX = (this.width - totalWidth) / 2;
 		int controlX = contentX + LABEL_WIDTH + GAP;
 
-		int rowsBlockHeight = ROW_SPACING * 7 + ROW_HEIGHT;
+		int rowsBlockHeight = ROW_SPACING * 8 + ROW_HEIGHT;
 		viewportBottom = this.height - PADDING;
 		int viewportHeight = viewportBottom - VIEWPORT_TOP;
 		maxScroll = Math.max(0, rowsBlockHeight - viewportHeight);
@@ -133,6 +134,10 @@ public class CtrlZScreen extends Screen {
 		rowY += ROW_SPACING;
 		creativeOnlyToggle = new ToggleButton(controlX, rowY, KeybindSettings.isCreativeOnly(), KeybindSettings::setCreativeOnly);
 		registerScrollWidget(creativeOnlyToggle, rowY);
+
+		rowY += ROW_SPACING;
+		blockOtherKeybindsToggle = new ToggleButton(controlX, rowY, KeybindSettings.isBlockOtherKeybinds(), KeybindSettings::setBlockOtherKeybinds);
+		registerScrollWidget(blockOtherKeybindsToggle, rowY);
 
 		int configButtonX = controlX + TOGGLE_WIDTH + CONFIG_BUTTON_GAP;
 
@@ -361,6 +366,7 @@ public class CtrlZScreen extends Screen {
 		context.text(this.font, "History (" + unitLabel(HistorySettings.getUnit()).toLowerCase(Locale.ROOT) + "):",
 			contentX, historyField.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
 		context.text(this.font, "Creative only:", contentX, creativeOnlyToggle.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
+		context.text(this.font, "Block other keys:", contentX, blockOtherKeybindsToggle.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
 		context.text(this.font, "Track blocks:", contentX, trackBlocksToggle.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
 		context.text(this.font, "Track entities:", contentX, trackEntitiesToggle.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
 		context.text(this.font, "Track inventory:", contentX, trackInventoryToggle.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
