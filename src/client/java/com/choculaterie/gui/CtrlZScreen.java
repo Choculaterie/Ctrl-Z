@@ -6,6 +6,9 @@ import com.choculaterie.history.UndoCategorySettings;
 import com.choculaterie.keybind.KeyCombo;
 import com.choculaterie.keybind.KeybindSettings;
 import com.choculaterie.network.ClearHistoryPayload;
+import com.choculaterie.vanilib.gui.theme.ButtonStyle;
+import com.choculaterie.vanilib.gui.theme.UIDraw;
+import com.choculaterie.vanilib.gui.theme.UIIcon;
 import com.choculaterie.vanilib.gui.theme.UITheme;
 import com.choculaterie.vanilib.gui.widget.CustomButton;
 import com.choculaterie.vanilib.gui.widget.CustomTextField;
@@ -33,10 +36,10 @@ public class CtrlZScreen extends Screen {
 	private static final int LABEL_WIDTH = 150;
 	private static final int GAP = 10;
 	private static final int CONTROL_WIDTH = 170;
-	private static final int ROW_HEIGHT = 20;
+	private static final int ROW_HEIGHT = UITheme.Dimensions.BUTTON_HEIGHT;
 	private static final int ROW_SPACING = 32;
 	private static final int PADDING = 10;
-	private static final int CLOSE_BUTTON_SIZE = 20;
+	private static final int CLOSE_BUTTON_SIZE = UITheme.Dimensions.BUTTON_HEIGHT;
 	private static final int VIEWPORT_TOP = 50;
 
 	private static final int HISTORY_FIELD_WIDTH = 100;
@@ -129,6 +132,7 @@ public class CtrlZScreen extends Screen {
 		rowY += ROW_SPACING;
 		clearButton = new CustomButton(controlX, rowY, CONTROL_WIDTH, ROW_HEIGHT,
 			Component.literal("Clear History"), b -> clearHistory());
+		clearButton.setIcon(UIIcon.TRASH).setStyle(ButtonStyle.DANGER);
 		registerScrollWidget(clearButton, rowY);
 
 		rowY += ROW_SPACING;
@@ -145,21 +149,24 @@ public class CtrlZScreen extends Screen {
 		trackBlocksToggle = new ToggleButton(controlX, rowY, UndoCategorySettings.isTrackBlocks(), UndoCategorySettings::setTrackBlocks);
 		registerScrollWidget(trackBlocksToggle, rowY);
 		CustomButton blocksConfigButton = new CustomButton(configButtonX, rowY, CONFIG_BUTTON_WIDTH, ROW_HEIGHT,
-			Component.literal("Actions..."), b -> openCauseSettings(CauseSettings.Category.BLOCKS, "Blocks", UndoCategorySettings::isTrackBlocks, UndoCategorySettings::setTrackBlocks));
+			Component.literal("Actions"), b -> openCauseSettings(CauseSettings.Category.BLOCKS, "Blocks", UndoCategorySettings::isTrackBlocks, UndoCategorySettings::setTrackBlocks));
+		blocksConfigButton.setIcon(UIIcon.GEAR);
 		registerScrollWidget(blocksConfigButton, rowY);
 
 		rowY += ROW_SPACING;
 		trackEntitiesToggle = new ToggleButton(controlX, rowY, UndoCategorySettings.isTrackEntities(), UndoCategorySettings::setTrackEntities);
 		registerScrollWidget(trackEntitiesToggle, rowY);
 		CustomButton entitiesConfigButton = new CustomButton(configButtonX, rowY, CONFIG_BUTTON_WIDTH, ROW_HEIGHT,
-			Component.literal("Actions..."), b -> openCauseSettings(CauseSettings.Category.ENTITIES, "Entities", UndoCategorySettings::isTrackEntities, UndoCategorySettings::setTrackEntities));
+			Component.literal("Actions"), b -> openCauseSettings(CauseSettings.Category.ENTITIES, "Entities", UndoCategorySettings::isTrackEntities, UndoCategorySettings::setTrackEntities));
+		entitiesConfigButton.setIcon(UIIcon.GEAR);
 		registerScrollWidget(entitiesConfigButton, rowY);
 
 		rowY += ROW_SPACING;
 		trackInventoryToggle = new ToggleButton(controlX, rowY, UndoCategorySettings.isTrackInventory(), UndoCategorySettings::setTrackInventory);
 		registerScrollWidget(trackInventoryToggle, rowY);
 		CustomButton inventoryConfigButton = new CustomButton(configButtonX, rowY, CONFIG_BUTTON_WIDTH, ROW_HEIGHT,
-			Component.literal("Actions..."), b -> openCauseSettings(CauseSettings.Category.INVENTORY, "Inventory", UndoCategorySettings::isTrackInventory, UndoCategorySettings::setTrackInventory));
+			Component.literal("Actions"), b -> openCauseSettings(CauseSettings.Category.INVENTORY, "Inventory", UndoCategorySettings::isTrackInventory, UndoCategorySettings::setTrackInventory));
+		inventoryConfigButton.setIcon(UIIcon.GEAR);
 		registerScrollWidget(inventoryConfigButton, rowY);
 
 		if (maxScroll > 0) {
@@ -216,6 +223,7 @@ public class CtrlZScreen extends Screen {
 	private void clearHistory() {
 		if (ClientPlayNetworking.canSend(ClearHistoryPayload.TYPE)) {
 			ClientPlayNetworking.send(new ClearHistoryPayload());
+			clearButton.showSuccess("Cleared");
 		}
 	}
 
@@ -223,7 +231,8 @@ public class CtrlZScreen extends Screen {
 		capturing = combo;
 		capturingButton = button;
 		capturingKeys.clear();
-		button.setMessage(Component.literal("> Press keys <"));
+		button.setMessage(Component.literal("Press keys..."));
+		button.setSelected(true);
 	}
 
 	@Override
@@ -265,6 +274,7 @@ public class CtrlZScreen extends Screen {
 
 	private void cancelCapture() {
 		capturingButton.setMessage(Component.literal(capturing.display()));
+		capturingButton.setSelected(false);
 		capturing = null;
 		capturingButton = null;
 		capturingKeys.clear();
@@ -279,6 +289,7 @@ public class CtrlZScreen extends Screen {
 		capturing.set(keys);
 		KeybindSettings.save();
 		capturingButton.setMessage(Component.literal(capturing.display()));
+		capturingButton.setSelected(false);
 		capturing = null;
 		capturingButton = null;
 		capturingKeys.clear();
@@ -351,8 +362,7 @@ public class CtrlZScreen extends Screen {
 		context.fill(0, 0, this.width, this.height, UITheme.Colors.PANEL_BG);
 		super.extractRenderState(context, mouseX, mouseY, delta);
 
-		int titleX = (this.width - this.font.width(TITLE)) / 2;
-		context.text(this.font, TITLE, titleX, titleY, UITheme.Colors.TEXT_PRIMARY);
+		UIDraw.centeredText(context, TITLE, this.width / 2, titleY, UITheme.Colors.TEXT_HIGHLIGHT);
 
 		boolean clip = maxScroll > 0;
 		if (clip) {
@@ -361,21 +371,24 @@ public class CtrlZScreen extends Screen {
 		for (AbstractWidget widget : scrollWidgets) {
 			widget.extractRenderState(context, mouseX, mouseY, delta);
 		}
-		context.text(this.font, "Undo key:", contentX, undoButton.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
-		context.text(this.font, "Redo key:", contentX, redoButton.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
-		context.text(this.font, "History (" + unitLabel(HistorySettings.getUnit()).toLowerCase(Locale.ROOT) + "):",
-			contentX, historyField.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
-		context.text(this.font, "Creative only:", contentX, creativeOnlyToggle.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
-		context.text(this.font, "Block other keys:", contentX, blockOtherKeybindsToggle.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
-		context.text(this.font, "Track blocks:", contentX, trackBlocksToggle.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
-		context.text(this.font, "Track entities:", contentX, trackEntitiesToggle.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
-		context.text(this.font, "Track inventory:", contentX, trackInventoryToggle.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
+		label(context, "Undo key", undoButton);
+		label(context, "Redo key", redoButton);
+		label(context, "History (" + unitLabel(HistorySettings.getUnit()).toLowerCase(Locale.ROOT) + ")", historyField);
+		label(context, "Creative only", creativeOnlyToggle);
+		label(context, "Block other keys", blockOtherKeybindsToggle);
+		label(context, "Track blocks", trackBlocksToggle);
+		label(context, "Track entities", trackEntitiesToggle);
+		label(context, "Track inventory", trackInventoryToggle);
 		if (clip) {
 			context.disableScissor();
 		}
 		if (scrollBar != null) {
 			scrollBar.extractRenderState(context, mouseX, mouseY, delta);
 		}
+	}
+
+	private void label(GuiGraphicsExtractor context, String text, AbstractWidget row) {
+		UIDraw.text(context, text, contentX, UIDraw.flatContentY(row.getY(), row.getHeight()), UITheme.Colors.TEXT_PRIMARY);
 	}
 
 	@Override

@@ -2,6 +2,8 @@ package com.choculaterie.gui;
 
 import com.choculaterie.history.Cause;
 import com.choculaterie.history.CauseSettings;
+import com.choculaterie.vanilib.gui.theme.UIDraw;
+import com.choculaterie.vanilib.gui.theme.UIIcon;
 import com.choculaterie.vanilib.gui.theme.UITheme;
 import com.choculaterie.vanilib.gui.widget.CustomButton;
 import com.choculaterie.vanilib.gui.widget.ScrollBar;
@@ -23,10 +25,10 @@ public class CauseSettingsScreen extends Screen {
 	private static final int LABEL_WIDTH = 190;
 	private static final int GAP = 10;
 	private static final int CONTROL_WIDTH = 170;
-	private static final int ROW_HEIGHT = 20;
+	private static final int ROW_HEIGHT = UITheme.Dimensions.BUTTON_HEIGHT;
 	private static final int ROW_SPACING = 26;
 	private static final int PADDING = 10;
-	private static final int CLOSE_BUTTON_SIZE = 20;
+	private static final int CLOSE_BUTTON_SIZE = UITheme.Dimensions.BUTTON_HEIGHT;
 	private static final int VIEWPORT_TOP = 50;
 
 	private final Screen parent;
@@ -61,7 +63,8 @@ public class CauseSettingsScreen extends Screen {
 		scrollAmount = 0;
 
 		CustomButton closeButton = new CustomButton(this.width - PADDING - CLOSE_BUTTON_SIZE, PADDING, CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE,
-			Component.literal("←"), b -> this.onClose());
+			Component.literal(""), b -> this.onClose());
+		closeButton.setIcon(UIIcon.ARROW_LEFT);
 		this.addRenderableWidget(closeButton);
 
 		int totalWidth = LABEL_WIDTH + GAP + CONTROL_WIDTH;
@@ -200,9 +203,7 @@ public class CauseSettingsScreen extends Screen {
 		context.fill(0, 0, this.width, this.height, UITheme.Colors.PANEL_BG);
 		super.extractRenderState(context, mouseX, mouseY, delta);
 
-		String titleText = this.getTitle().getString();
-		int titleX = (this.width - this.font.width(titleText)) / 2;
-		context.text(this.font, titleText, titleX, titleY, UITheme.Colors.TEXT_PRIMARY);
+		UIDraw.centeredText(context, this.getTitle().getString(), this.width / 2, titleY, UITheme.Colors.TEXT_HIGHLIGHT);
 
 		boolean clip = maxScroll > 0;
 		if (clip) {
@@ -211,7 +212,7 @@ public class CauseSettingsScreen extends Screen {
 		for (int i = 0; i < scrollWidgets.size(); i++) {
 			AbstractWidget widget = scrollWidgets.get(i);
 			widget.extractRenderState(context, mouseX, mouseY, delta);
-			context.text(this.font, rowLabels.get(i), contentX, widget.getY() + 6, UITheme.Colors.TEXT_PRIMARY);
+			UIDraw.text(context, rowLabels.get(i), contentX, UIDraw.flatContentY(widget.getY(), widget.getHeight()), UITheme.Colors.TEXT_PRIMARY);
 		}
 		if (clip) {
 			context.disableScissor();
