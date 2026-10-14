@@ -86,8 +86,8 @@ public class CtrlZScreen extends Screen {
 		scrollAmount = 0;
 
 		closeButton = new CustomButton(this.width - PADDING - CLOSE_BUTTON_SIZE, PADDING, CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE,
-			Component.literal("X"), b -> this.onClose());
-		closeButton.setRenderAsXIcon(true);
+			Component.empty(), b -> this.onClose());
+		closeButton.setIcon(UIIcon.CLOSE);
 		this.addRenderableWidget(closeButton);
 
 		int totalWidth = LABEL_WIDTH + GAP + CONTROL_WIDTH;
@@ -150,7 +150,7 @@ public class CtrlZScreen extends Screen {
 		registerScrollWidget(trackBlocksToggle, rowY);
 		CustomButton blocksConfigButton = new CustomButton(configButtonX, rowY, CONFIG_BUTTON_WIDTH, ROW_HEIGHT,
 			Component.literal("Actions"), b -> openCauseSettings(CauseSettings.Category.BLOCKS, "Blocks", UndoCategorySettings::isTrackBlocks, UndoCategorySettings::setTrackBlocks));
-		blocksConfigButton.setIcon(UIIcon.GEAR);
+		blocksConfigButton.setIcon(UIIcon.SLIDERS);
 		registerScrollWidget(blocksConfigButton, rowY);
 
 		rowY += ROW_SPACING;
@@ -158,7 +158,7 @@ public class CtrlZScreen extends Screen {
 		registerScrollWidget(trackEntitiesToggle, rowY);
 		CustomButton entitiesConfigButton = new CustomButton(configButtonX, rowY, CONFIG_BUTTON_WIDTH, ROW_HEIGHT,
 			Component.literal("Actions"), b -> openCauseSettings(CauseSettings.Category.ENTITIES, "Entities", UndoCategorySettings::isTrackEntities, UndoCategorySettings::setTrackEntities));
-		entitiesConfigButton.setIcon(UIIcon.GEAR);
+		entitiesConfigButton.setIcon(UIIcon.SLIDERS);
 		registerScrollWidget(entitiesConfigButton, rowY);
 
 		rowY += ROW_SPACING;
@@ -166,7 +166,7 @@ public class CtrlZScreen extends Screen {
 		registerScrollWidget(trackInventoryToggle, rowY);
 		CustomButton inventoryConfigButton = new CustomButton(configButtonX, rowY, CONFIG_BUTTON_WIDTH, ROW_HEIGHT,
 			Component.literal("Actions"), b -> openCauseSettings(CauseSettings.Category.INVENTORY, "Inventory", UndoCategorySettings::isTrackInventory, UndoCategorySettings::setTrackInventory));
-		inventoryConfigButton.setIcon(UIIcon.GEAR);
+		inventoryConfigButton.setIcon(UIIcon.SLIDERS);
 		registerScrollWidget(inventoryConfigButton, rowY);
 
 		if (maxScroll > 0) {
