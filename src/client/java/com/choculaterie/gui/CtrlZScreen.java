@@ -43,11 +43,11 @@ public class CtrlZScreen extends Screen {
 	private static final int VIEWPORT_TOP = 50;
 
 	private static final int HISTORY_FIELD_WIDTH = 100;
-	private static final int HISTORY_UNIT_GAP = 6;
+	private static final int HISTORY_UNIT_GAP = 4;
 	private static final int HISTORY_UNIT_WIDTH = 64;
 	private static final int TOGGLE_WIDTH = 40;
 	private static final int CONFIG_BUTTON_WIDTH = 80;
-	private static final int CONFIG_BUTTON_GAP = 6;
+	private static final int CONFIG_BUTTON_GAP = 4;
 
 	private CustomButton closeButton;
 	private CustomButton undoButton;
