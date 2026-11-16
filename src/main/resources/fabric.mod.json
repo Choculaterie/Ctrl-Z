@@ -15,7 +15,7 @@
 		"sources": "https://github.com/Choculaterie/ctrl-z",
 		"issues": "https://github.com/Choculaterie/ctrl-z/issues"
 	},
-	"license": "MIT",
+	"license": "AGPL-3.0-only",
 	"icon": "assets/ctrl-z/icon.png",
 	"environment": "*",
 	"entrypoints": {
